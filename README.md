@@ -2,7 +2,7 @@
 
 Async content moderation API — detect spam, toxicity, scam, and NSFW content via REST, built for startups that need moderation without training their own models.
 
-`Python` · `FastAPI` · `PostgreSQL` · `Redis` · `Docker Compose` · `Prometheus` · `Grafana`
+`Python` · `FastAPI` · `PostgreSQL` · `Redis` · `S3` · `Docker Compose` · `Prometheus` · `Grafana`
 
 ---
 
