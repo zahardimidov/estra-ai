@@ -1,0 +1,213 @@
+---
+test_name: Moderate text - unauthorized without token
+
+stages:
+  - name: POST /v1/moderate/text without Authorization returns 403
+    request:
+      url: "{host}/v1/moderate/text"
+      method: POST
+      json:
+        text: "buy now"
+        categories:
+          - spam
+          - toxicity
+    response:
+      status_code: 403
+
+---
+test_name: Moderate text - unauthorized with invalid token
+
+stages:
+  - name: POST /v1/moderate/text with invalid token returns 401
+    request:
+      url: "{host}/v1/moderate/text"
+      method: POST
+      headers:
+        Authorization: "Bearer invalid-token"
+      json:
+        text: "buy now"
+        categories:
+          - spam
+          - toxicity
+    response:
+      status_code: 401
+
+---
+test_name: Moderate text - submit and fetch task status
+
+stages:
+  - name: Register moderation user
+    request:
+      url: "{host}/v1/auth/sign-up"
+      method: POST
+      json:
+        email: "moderation_text_user@example.com"
+        password: "TestPass1!"
+        password_repeat: "TestPass1!"
+    response:
+      status_code: 200
+      save:
+        json:
+          auth_token: token
+
+  - name: POST /v1/moderate/text returns 202 and task id
+    request:
+      url: "{host}/v1/moderate/text"
+      method: POST
+      headers:
+        Authorization: "Bearer {auth_token}"
+      json:
+        text: "Limited offer, buy now and get rich fast"
+        categories:
+          - spam
+          - scam
+    response:
+      status_code: 202
+      json:
+        task_id: !anystr
+        status: "pending"
+      save:
+        json:
+          created_task_id: task_id
+
+  # The worker (BRPOP + synchronous keyword-stub inference) is fast enough
+  # that by the time this GET lands, processing has already finished — so we
+  # assert the final state rather than racing against the worker for "pending".
+  - name: GET /v1/tasks/<task_id> returns completed status for owner
+    request:
+      url: "{host}/v1/tasks/{created_task_id}"
+      method: GET
+      headers:
+        Authorization: "Bearer {auth_token}"
+    response:
+      status_code: 200
+      json:
+        task_id: "{created_task_id}"
+        status: "completed"
+        categories:
+          - spam
+          - scam
+        decision: "blocked"
+        scores:
+          spam: !anyfloat
+          scam: !anyfloat
+        model_versions:
+          spam: !anystr
+          scam: !anystr
+        created_at: !anystr
+        completed_at: !anystr
+
+---
+test_name: Moderate text - missing text field returns 422
+
+stages:
+  - name: Register user
+    request:
+      url: "{host}/v1/auth/sign-up"
+      method: POST
+      json:
+        email: "mod_422@example.com"
+        password: "TestPass1!"
+        password_repeat: "TestPass1!"
+
+  - name: Sign in
+    request:
+      url: "{host}/v1/auth/sign-in"
+      method: POST
+      json:
+        email: "mod_422@example.com"
+        password: "TestPass1!"
+    response:
+      status_code: 200
+      save:
+        json:
+          auth_token: token
+
+  - name: POST /moderate/text without text field returns 422
+    request:
+      url: "{host}/v1/moderate/text"
+      method: POST
+      headers:
+        Authorization: "Bearer {auth_token}"
+      json:
+        categories:
+          - spam
+    response:
+      status_code: 422
+
+---
+test_name: Get task - unknown task_id returns 404
+
+stages:
+  - name: Register user
+    request:
+      url: "{host}/v1/auth/sign-up"
+      method: POST
+      json:
+        email: "mod_404@example.com"
+        password: "TestPass1!"
+        password_repeat: "TestPass1!"
+
+  - name: Sign in
+    request:
+      url: "{host}/v1/auth/sign-in"
+      method: POST
+      json:
+        email: "mod_404@example.com"
+        password: "TestPass1!"
+    response:
+      status_code: 200
+      save:
+        json:
+          auth_token: token
+
+  - name: GET /tasks with nonexistent id returns 404
+    request:
+      url: "{host}/v1/tasks/00000000-0000-0000-0000-000000000000"
+      method: GET
+      headers:
+        Authorization: "Bearer {auth_token}"
+    response:
+      status_code: 404
+
+---
+test_name: Moderate text - custom single category (toxicity)
+
+stages:
+  - name: Register user
+    request:
+      url: "{host}/v1/auth/sign-up"
+      method: POST
+      json:
+        email: "mod_toxicity@example.com"
+        password: "TestPass1!"
+        password_repeat: "TestPass1!"
+
+  - name: Sign in
+    request:
+      url: "{host}/v1/auth/sign-in"
+      method: POST
+      json:
+        email: "mod_toxicity@example.com"
+        password: "TestPass1!"
+    response:
+      status_code: 200
+      save:
+        json:
+          auth_token: token
+
+  - name: Submit text with only toxicity category returns 202
+    request:
+      url: "{host}/v1/moderate/text"
+      method: POST
+      headers:
+        Authorization: "Bearer {auth_token}"
+      json:
+        text: "I hate you and want you to suffer"
+        categories:
+          - toxicity
+    response:
+      status_code: 202
+      json:
+        task_id: !anystr
+        status: "pending"

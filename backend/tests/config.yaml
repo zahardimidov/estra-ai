@@ -1,0 +1,6 @@
+name: Global test configuration
+
+variables:
+  host: "http://localhost:80"
+  test_email: "testuser@example.com"
+  test_password: "TestPass1!"

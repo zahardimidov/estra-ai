@@ -1,0 +1,94 @@
+---
+test_name: Sign up - success
+
+stages:
+  - name: POST /v1/auth/sign-up returns 200 and token
+    request:
+      url: "{host}/v1/auth/sign-up"
+      method: POST
+      json:
+        email: "{test_email}"
+        password: "{test_password}"
+        password_repeat: "{test_password}"
+    response:
+      status_code: 200
+      json:
+        token: !anystr
+
+---
+test_name: Sign up - conflict on duplicate email
+
+stages:
+  - name: First sign up
+    request:
+      url: "{host}/v1/auth/sign-up"
+      method: POST
+      json:
+        email: "{test_email}"
+        password: "{test_password}"
+        password_repeat: "{test_password}"
+
+  - name: Second sign up with same email returns 409
+    request:
+      url: "{host}/v1/auth/sign-up"
+      method: POST
+      json:
+        email: "{test_email}"
+        password: "{test_password}"
+        password_repeat: "{test_password}"
+    response:
+      status_code: 409
+
+---
+test_name: Sign up - passwords do not match
+
+stages:
+  - name: POST /v1/auth/sign-up with mismatched passwords returns 422
+    request:
+      url: "{host}/v1/auth/sign-up"
+      method: POST
+      json:
+        email: "{test_email}"
+        password: "{test_password}"
+        password_repeat: "WrongPass1!"
+    response:
+      status_code: 422
+
+---
+test_name: Sign in - success
+
+stages:
+  - name: Register user
+    request:
+      url: "{host}/v1/auth/sign-up"
+      method: POST
+      json:
+        email: "{test_email}"
+        password: "{test_password}"
+        password_repeat: "{test_password}"
+
+  - name: POST /v1/auth/sign-in returns 200 and token
+    request:
+      url: "{host}/v1/auth/sign-in"
+      method: POST
+      json:
+        email: "{test_email}"
+        password: "{test_password}"
+    response:
+      status_code: 200
+      json:
+        token: !anystr
+
+---
+test_name: Sign in - wrong password
+
+stages:
+  - name: POST /v1/auth/sign-in with wrong password returns 401
+    request:
+      url: "{host}/v1/auth/sign-in"
+      method: POST
+      json:
+        email: "{test_email}"
+        password: "WrongPass1!"
+    response:
+      status_code: 401

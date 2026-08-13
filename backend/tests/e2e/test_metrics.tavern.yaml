@@ -1,0 +1,10 @@
+---
+test_name: Metrics endpoint is exposed
+
+stages:
+  - name: GET /metrics returns 200 with Prometheus text format
+    request:
+      url: "{host}/metrics"
+      method: GET
+    response:
+      status_code: 200

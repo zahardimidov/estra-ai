@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+# Virtual environments
+.venv/
+venv/
+
+# Local secrets / env
+.env
+.env.*
+!.env.example
+
+# Local SQLite DB (used by the non-docker quickstart)
+local.db
+
+# macOS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+
+# Personal / local-only docs
+CLAUDE.md
+commands.md

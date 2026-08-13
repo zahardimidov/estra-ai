@@ -1,0 +1,12 @@
+---
+test_name: Ping returns ok
+
+stages:
+  - name: GET /v1/ping returns 200 with status ok
+    request:
+      url: "{host}/v1/ping"
+      method: GET
+    response:
+      status_code: 200
+      json:
+        status: "ok"

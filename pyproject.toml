@@ -1,0 +1,43 @@
+[project]
+name = "estra-ai"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "aiohttp>=3.9.0",
+    "aiosqlite>=0.22.1",
+    "argon2-cffi>=25.1.0",
+    "fastapi>=0.133.1",
+    "greenlet>=3.3.2",
+    "passlib>=1.7.4",
+    "pydantic>=2.12.5",
+    "pyjwt>=2.11.0",
+    "python-dotenv>=1.2.1",
+    "redis[asyncio]>=5.0.0",
+    "pytz>=2025.2",
+    "sqlalchemy>=2.0.47",
+    "uvicorn>=0.41.0",
+    "python-multipart>=0.0.22",
+    "asyncpg>=0.31.0",
+    "aiobotocore>=3.9.0",
+    "prometheus-client>=0.26.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=9.0.2",
+    "pytest-asyncio>=0.25.0",
+    "tavern[pytest]>=2.13.0",
+]
+
+[tool.ruff]
+line-length = 110
+src = ["backend"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "SIM"]
+# B008: FastAPI's Depends()-as-default is the framework's intended DI pattern, not a bug.
+# B904: skip the "raise ... from" requirement — keep plain `raise` inside except blocks.
+ignore = ["B008", "B904"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["api", "core", "domain", "infrastructure", "ml", "workers"]

@@ -1,0 +1,338 @@
+---
+test_name: API Keys - unauthorized without token
+
+stages:
+  - name: POST /v1/apikeys without Authorization returns 403
+    request:
+      url: "{host}/v1/apikeys"
+      method: POST
+      json:
+        name: "prod"
+    response:
+      status_code: 403
+
+---
+test_name: API Keys - create returns raw key once
+
+stages:
+  - name: Register user
+    request:
+      url: "{host}/v1/auth/sign-up"
+      method: POST
+      json:
+        email: "apikey_create_user@example.com"
+        password: "TestPass1!"
+        password_repeat: "TestPass1!"
+    response:
+      status_code: 200
+      save:
+        json:
+          auth_token: token
+
+  - name: POST /v1/apikeys returns 201 with raw key
+    request:
+      url: "{host}/v1/apikeys"
+      method: POST
+      headers:
+        Authorization: "Bearer {auth_token}"
+      json:
+        name: "prod"
+        request_limit: 500
+    response:
+      status_code: 201
+      json:
+        id: !anystr
+        name: "prod"
+        key: !anystr
+        request_limit: 500
+        created_at: !anystr
+
+---
+test_name: API Keys - list only returns own keys
+
+stages:
+  - name: Register user
+    request:
+      url: "{host}/v1/auth/sign-up"
+      method: POST
+      json:
+        email: "apikey_list_user@example.com"
+        password: "TestPass1!"
+        password_repeat: "TestPass1!"
+    response:
+      status_code: 200
+      save:
+        json:
+          auth_token: token
+
+  - name: Create a key
+    request:
+      url: "{host}/v1/apikeys"
+      method: POST
+      headers:
+        Authorization: "Bearer {auth_token}"
+      json:
+        name: "listed-key"
+    response:
+      status_code: 201
+
+  - name: GET /v1/apikeys returns created key without raw value
+    request:
+      url: "{host}/v1/apikeys"
+      method: GET
+      headers:
+        Authorization: "Bearer {auth_token}"
+    response:
+      status_code: 200
+      json:
+        - id: !anystr
+          name: "listed-key"
+          is_active: true
+          request_limit: 1000
+          created_at: !anystr
+
+---
+test_name: API Keys - delete removes key
+
+stages:
+  - name: Register user
+    request:
+      url: "{host}/v1/auth/sign-up"
+      method: POST
+      json:
+        email: "apikey_delete_user@example.com"
+        password: "TestPass1!"
+        password_repeat: "TestPass1!"
+    response:
+      status_code: 200
+      save:
+        json:
+          auth_token: token
+
+  - name: Create a key
+    request:
+      url: "{host}/v1/apikeys"
+      method: POST
+      headers:
+        Authorization: "Bearer {auth_token}"
+      json:
+        name: "to-delete"
+    response:
+      status_code: 201
+      save:
+        json:
+          created_key_id: id
+
+  - name: DELETE /v1/apikeys/<id> returns 204
+    request:
+      url: "{host}/v1/apikeys/{created_key_id}"
+      method: DELETE
+      headers:
+        Authorization: "Bearer {auth_token}"
+    response:
+      status_code: 204
+
+  - name: GET /v1/apikeys no longer lists deleted key
+    request:
+      url: "{host}/v1/apikeys"
+      method: GET
+      headers:
+        Authorization: "Bearer {auth_token}"
+    response:
+      status_code: 200
+      json: []
+
+---
+test_name: API Keys - delete unknown id returns 404
+
+stages:
+  - name: Register user
+    request:
+      url: "{host}/v1/auth/sign-up"
+      method: POST
+      json:
+        email: "apikey_delete404_user@example.com"
+        password: "TestPass1!"
+        password_repeat: "TestPass1!"
+    response:
+      status_code: 200
+      save:
+        json:
+          auth_token: token
+
+  - name: DELETE /v1/apikeys/<unknown-id> returns 404
+    request:
+      url: "{host}/v1/apikeys/00000000-0000-0000-0000-000000000000"
+      method: DELETE
+      headers:
+        Authorization: "Bearer {auth_token}"
+    response:
+      status_code: 404
+
+---
+test_name: API Keys - use raw key to authenticate moderation request
+
+stages:
+  - name: Register user
+    request:
+      url: "{host}/v1/auth/sign-up"
+      method: POST
+      json:
+        email: "apikey_auth_user@example.com"
+        password: "TestPass1!"
+        password_repeat: "TestPass1!"
+    response:
+      status_code: 200
+      save:
+        json:
+          auth_token: token
+
+  - name: Create a key
+    request:
+      url: "{host}/v1/apikeys"
+      method: POST
+      headers:
+        Authorization: "Bearer {auth_token}"
+      json:
+        name: "moderation-access"
+    response:
+      status_code: 201
+      save:
+        json:
+          raw_api_key: key
+
+  - name: POST /v1/moderate/text with X-API-Key returns 202
+    request:
+      url: "{host}/v1/moderate/text"
+      method: POST
+      headers:
+        X-API-Key: "{raw_api_key}"
+      json:
+        text: "hello world"
+        categories:
+          - spam
+    response:
+      status_code: 202
+      json:
+        task_id: !anystr
+        status: "pending"
+
+---
+test_name: API Keys - invalid raw key returns 401
+
+stages:
+  - name: POST /v1/moderate/text with unknown X-API-Key returns 401
+    request:
+      url: "{host}/v1/moderate/text"
+      method: POST
+      headers:
+        X-API-Key: "sk-does-not-exist"
+      json:
+        text: "hello world"
+        categories:
+          - spam
+    response:
+      status_code: 401
+
+---
+test_name: API Keys - JWT requests are not rate limited
+
+stages:
+  - name: Register user
+    request:
+      url: "{host}/v1/auth/sign-up"
+      method: POST
+      json:
+        email: "apikey_jwt_unlimited_user@example.com"
+        password: "TestPass1!"
+        password_repeat: "TestPass1!"
+    response:
+      status_code: 200
+      save:
+        json:
+          auth_token: token
+
+  - name: First JWT request returns 202
+    request:
+      url: "{host}/v1/moderate/text"
+      method: POST
+      headers:
+        Authorization: "Bearer {auth_token}"
+      json:
+        text: "hello world"
+        categories:
+          - spam
+    response:
+      status_code: 202
+
+  - name: Second JWT request also returns 202 (no limit)
+    request:
+      url: "{host}/v1/moderate/text"
+      method: POST
+      headers:
+        Authorization: "Bearer {auth_token}"
+      json:
+        text: "hello world again"
+        categories:
+          - spam
+    response:
+      status_code: 202
+
+---
+test_name: API Keys - exceeding request_limit returns 429
+
+stages:
+  - name: Register user
+    request:
+      url: "{host}/v1/auth/sign-up"
+      method: POST
+      json:
+        email: "apikey_rate_limit_user@example.com"
+        password: "TestPass1!"
+        password_repeat: "TestPass1!"
+    response:
+      status_code: 200
+      save:
+        json:
+          auth_token: token
+
+  - name: Create a key with request_limit=1
+    request:
+      url: "{host}/v1/apikeys"
+      method: POST
+      headers:
+        Authorization: "Bearer {auth_token}"
+      json:
+        name: "rate-limited-key"
+        request_limit: 1
+    response:
+      status_code: 201
+      save:
+        json:
+          raw_api_key: key
+
+  - name: First request within limit returns 202
+    request:
+      url: "{host}/v1/moderate/text"
+      method: POST
+      headers:
+        X-API-Key: "{raw_api_key}"
+      json:
+        text: "hello world"
+        categories:
+          - spam
+    response:
+      status_code: 202
+
+  - name: Second request exceeds limit and returns 429
+    request:
+      url: "{host}/v1/moderate/text"
+      method: POST
+      headers:
+        X-API-Key: "{raw_api_key}"
+      json:
+        text: "hello again"
+        categories:
+          - spam
+    response:
+      status_code: 429
